@@ -9,13 +9,16 @@ app = Flask(__name__)
 TOKEN = '7956558016:AAHD-lrL5s5IHQ7X0u1zCZ2z0OmvkH8eDto'
 TELEGRAM_URL = f"https://api.telegram.org/bot{TOKEN}/sendMessage"
 
+#ставимо вебхук в разі заміни посилання на ngrok
 def set_webhook():
-    new_webhook_url = "https://ad748a5b8bd1.ngrok-free.app/bot"  # Замініть на нову адресу
+    new_webhook_url = "https://6d897a75db67.ngrok-free.app/bot"  # Замінити на нову адресу
     response = requests.get(
         f"https://api.telegram.org/bot{TOKEN}/setWebhook?url={new_webhook_url}"
     )
     print("Webhook setup result:", response.json())
 
+
+#дешифратор коду
 def decode_esc_pos(raw_data):
     result = []
     i = 0
@@ -50,7 +53,20 @@ def decode_esc_pos(raw_data):
     return ''.join(result)
 
 
+
+#універсальна відправка повідомлень
 def send_message(chat_id, text):
+    """Надсилання повідомлення в Telegram"""
+    try:
+        requests.post(TELEGRAM_URL, json={
+            'chat_id': chat_id,
+            'text': text,
+        })
+    except Exception as e:
+        print(f"Помилка відправки: {e}")
+        
+        
+def send_last_recepient(chat_id, text):
     """Надсилання повідомлення в Telegram"""
     try:
         requests.post(TELEGRAM_URL, json={
@@ -61,6 +77,9 @@ def send_message(chat_id, text):
     except Exception as e:
         print(f"Помилка відправки: {e}")
 
+
+
+#отримання данних від принтеру
 def handle_printer(conn):
     """Обробка даних від принтера"""
     full_text = []
@@ -77,16 +96,18 @@ def handle_printer(conn):
         
         # Надсилання всім підписаним користувачам
         try:
-            with open("subscribet_ID.txt", "r", encoding='utf-8') as f:
+            with open("subscribet_ID.txt", "r", encoding='utf-8') as f:# тут треба замінити щоб відправлялося лише підписаним користувачам
                 for chat_id in f.read().splitlines():
                     if chat_id.strip():
-                        send_message(chat_id.strip(), f"🖨 Новий чек:\n\n```\n{check_text}\n```")
+                        send_last_recepient(chat_id.strip(), f"🖨 Новий чек:\n\n```\n{check_text}\n```")
                         print("надіслано чек")
         except FileNotFoundError:
             pass
 
+
+
+#Сервер для прийому даних з принтера
 def printer_server():
-    """Сервер для прийому даних з принтера"""
     with socket.socket() as s:
         s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         s.bind(('0.0.0.0', 9100))
@@ -102,6 +123,8 @@ def printer_server():
                 print(f"Помилка: {e}")
     
 
+
+#надсилання останнього чеку файлом
 def send_recepient_file(chat_id, file_path):
     TELEGRAM_URL_DOC = f"https://api.telegram.org/bot{TOKEN}"
     with open(file_path, 'rb') as file:
@@ -111,12 +134,24 @@ def send_recepient_file(chat_id, file_path):
                 data={'chat_id': chat_id}
             )
             return response.json()
+        
+
+def insub(chat_id, file_path):
+    # Зчитуємо всі рядки з файлу
+    with open(file_path, 'r') as f:
+        lines = f.readlines()
+
+    # Видаляємо chat_id, якщо він є в списку
+    new_lines = [line for line in lines if line.strip() != str(chat_id)]
+
+    # Перезаписуємо файл без видаленого chat_id
+    with open(file_path, 'w') as f:
+        f.writelines(new_lines)
 
     
-
+#Обробка команд Telegram бота
 @app.route('/bot', methods=['POST'])
 def bot():
-    """Обробка команд Telegram бота"""
     data = request.json
     message = data.get('message', {})
     chat_id = message.get('chat', {}).get('id')
@@ -139,21 +174,27 @@ def bot():
         if not already_subscribed:
             with open("subscribet_ID.txt", "a", encoding='utf-8') as f:
                 f.write(f"{chat_id}\n")
-            send_message(chat_id, "✅ Ви підписані на отримання чеків.")
+            send_message(chat_id, "✅ Ви підписані на отримання чеків. \n/print - отримати останній друкований чек \n/file - отримати файл чеку \n/unsub - для відписки від бота")
         else:
-            send_message(chat_id, "ℹ️ Ви вже підписані на отримання чеків.")
+            send_message(chat_id, "ℹ️ Ви вже підписані на отримання чеків.\n/print - отримати останній друкований чек \n/file - отримати файл чеку \n/unsub - для відписки від бота")
+    #друк чеків по команді
     elif text == "/print":
         try:
             with open("printer_checks.txt", "r", encoding='utf-8') as f:
                 last_check = f.read()
-            send_message(chat_id, last_check if last_check else "Чеків ще немає")
+            if last_check:
+                send_last_recepient(chat_id, f"🖨 Останній чек:\n\n```\n{last_check}\n```")
         except FileNotFoundError:
             send_message(chat_id, "Чеків ще немає")
+    #друк чеків з файлу
     elif text == "/file":
         file_path = "printer_checks.txt"  # Шлях до вашого файлу
         send_recepient_file(chat_id, file_path)
+    elif text == "/unsub":
+        insub(chat_id, "subscribet_ID.txt")
+        send_message(chat_id, "Ви успішно відписалися від отримання нових чеків, для підписки натисніть /start")
     else:
-        send_message(chat_id, "/start - ініціалізація бота \n/print - отримати останній друкований чек \n/file - отримати файл чеку")
+        send_message(chat_id, "/start - ініціалізація бота \n/print - отримати останній друкований чек \n/file - отримати файл чеку \n/unsub - для відписки від бота")
 
     return jsonify({'ok': True})
 
