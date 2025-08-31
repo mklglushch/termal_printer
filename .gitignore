@@ -1,3 +1,12 @@
 subscribet_ID.txt
 bot.py
 users.db
+з-звіт.bin
+фіскальний чек.bin
+х-звіт.bin
+bd.py
+printer_output_hex.txt
+tok.py
+__pycache__
+printer_raw.bin
+.venv
