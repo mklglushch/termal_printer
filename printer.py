@@ -1,4 +1,5 @@
 import threading, socket
+import sqlite3
 
 
 
@@ -41,11 +42,39 @@ def decode_esc_pos(raw_data):
     return ''.join(result)
 
 
+def new_folder(file_path, check_text, db_path="checks.db"):
+    with open(file_path, "r", encoding="utf-8") as f:
+            first_line = f.readline().strip()  # strip() прибере \n в кінці
+    # 2. Підключаємось до бази (якщо немає - створиться)
+    conn = sqlite3.connect(db_path)
+    cursor = conn.cursor()
+
+    # 3. Створюємо таблицю, якщо вона ще не існує
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS checks (
+            zaklad TEXT PRIMARY KEY,
+            check_text TEXT NOT NULL
+        );
+    """)
+
+    # 4. Додаємо запис (наприклад, заклад можна передати параметром)
+    cursor.execute("""
+        INSERT INTO checks (zaklad, check_text)
+        VALUES (?, ?)
+        ON CONFLICT(zaklad) DO UPDATE SET check_text = excluded.check_text
+        """, (first_line, check_text))
+    
+    
+
+    # 5. Зберігаємо і закриваємо
+    conn.commit()
+    conn.close()
+
+
 # отримання даних від принтера
 def handle_printer(conn):
     """Обробка даних від принтера"""
     full_text = []
-    raw_data_list = []
 
     while True:
         data = conn.recv(2048)
@@ -56,15 +85,16 @@ def handle_printer(conn):
 
     if full_text:
         check_text = ''.join(full_text)
-
-        # Запис тексту
-        with open("printer_checks.txt", "w", encoding='utf-8') as f:
-            f.write(check_text)
-            f.write("\n")
-        # Запис сирих байтів
-        # with open("printer_raw.bin", "wb") as f:
-        #     for chunk in raw_data_list:
-        #         f.write(chunk)
+        if check_text == "C":
+            pass
+        else:
+            # Запис тексту
+            with open("printer_checks.txt", "w", encoding='utf-8') as f:
+                f.write(check_text)
+                f.write("\n")
+        
+            new_folder("printer_checks.txt", check_text)
+        
 
 
 
