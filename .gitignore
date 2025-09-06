@@ -12,3 +12,4 @@ printer_raw.bin
 .venv
 printer_checks.txt
 checks.db
+test.py

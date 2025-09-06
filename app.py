@@ -2,13 +2,21 @@ from aiogram import Router, types, F
 from aiogram.filters import CommandStart
 from aiogram.types import Message
 import button as bt
+from simple_func import add_users, list_institution
 router = Router()
 
 #команда /start
 @router.message(CommandStart())
-async def start(message:Message):
+async def start(message: types.Message):
+    user_info = message.from_user
+    add_users(user_info)
     await message.answer("Привіт, я емулятор термального принтеру", reply_markup=bt.main)
     
+@router.message(F.text == "/check")
+async def list(message:Message):
+    await message.answer(list_institution(), reply_markup=bt.main)
+
+
 
 @router.message(F.text == "Файл останнього чеку")
 async def get_file(message:Message):

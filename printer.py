@@ -42,7 +42,7 @@ def decode_esc_pos(raw_data):
     return ''.join(result)
 
 
-def new_folder(file_path, check_text, db_path="checks.db"):
+def new_folder(file_path, check_text, db_path="info.db"):
     with open(file_path, "r", encoding="utf-8") as f:
             first_line = f.readline().strip()  # strip() прибере \n в кінці
     # 2. Підключаємось до бази (якщо немає - створиться)
